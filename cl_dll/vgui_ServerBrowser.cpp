@@ -1,4 +1,4 @@
-//========= Copyright © 1996-2002, Valve LLC, All rights reserved. ============
+//========= Copyright ï¿½ 1996-2002, Valve LLC, All rights reserved. ============
 //
 // Purpose: 
 //
@@ -154,7 +154,7 @@ public:
 
 		// Space for buttons
 		height -= YRES(20);
-		height = max( 0, height );
+		height = std::max( 0, height );
 
 		rowcount = height / CELL_HEIGHT;
 

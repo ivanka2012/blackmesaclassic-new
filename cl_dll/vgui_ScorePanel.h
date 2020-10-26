@@ -14,6 +14,7 @@
 #include<VGUI_TextGrid.h>
 #include<VGUI_Label.h>
 #include<VGUI_TextImage.h>
+#include <algorithm>
 #include "../game_shared/vgui_listbox.h"
 
 #include <ctype.h>
@@ -62,7 +63,7 @@ public:
 		_image[1]->getTextSize(w2, t2);
 
 		wide = w1 + w2;
-		tall = max(t1, t2);
+		tall = std::max(t1, t2);
 		setSize(wide, tall);
 	}
 
