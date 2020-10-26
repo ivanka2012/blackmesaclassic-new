@@ -1,0 +1,3 @@
+[submodule "modstub"]
+	path = modstub
+	url = https://github.com/ivanka2012/blackmesaclassic-stub
