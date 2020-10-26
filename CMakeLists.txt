@@ -38,14 +38,11 @@ ExternalProject_Add(fmt
         ${CMAKE_COMMAND} --build . --target install --config ${CONFIG_TYPE}
 )
 
+install(SCRIPT ${CMAKE_SOURCE_DIR}/MakeLicense.cmake)
+
 add_subdirectory(cl_dll)
 add_subdirectory(dlls)
 add_subdirectory(modstub)
 
 add_dependencies(hl fmt)
-
 add_dependencies(client fmt)
-
-install(CODE
-    "execute_process(COMMAND ${CMAKE_COMMAND} -P ${CMAKE_SOURCE_DIR}/MakeLicense.cmake)"
-)

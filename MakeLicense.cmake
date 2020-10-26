@@ -2,6 +2,8 @@ set(LICENSE_FILE ${CMAKE_INSTALL_PREFIX}/bmc/LICENSES.txt)
 file(MAKE_DIRECTORY ${CMAKE_INSTALL_PREFIX}/bmc)
 file(REMOVE ${LICENSE_FILE})
 
+message("${CMAKE_INSTALL_PREFIX}")
+
 function(AddLicenseText)
     cmake_parse_arguments(
         PARSED_ARGS
