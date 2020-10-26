@@ -1,0 +1,23 @@
+ CMakeLists.txt | 2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index f21cf456..5ca889ef 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -50,6 +50,7 @@ if (MASTER_PROJECT AND NOT CMAKE_BUILD_TYPE)
+               "CMAKE_C_FLAGS used) Debug Release RelWithDebInfo MinSizeRel.")
+ endif ()
+ 
++cmake_policy(SET CMP0091 NEW)
+ project(FMT CXX)
+ include(GNUInstallDirs)
+ set_verbose(FMT_INC_DIR ${CMAKE_INSTALL_INCLUDEDIR} CACHE STRING
+@@ -193,6 +194,7 @@ endif ()
+ 
+ add_library(fmt ${FMT_SOURCES} ${FMT_HEADERS} README.rst ChangeLog.rst)
+ add_library(fmt::fmt ALIAS fmt)
++set_property(TARGET fmt PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+ 
+ if (HAVE_STRTOD_L)
+   target_compile_definitions(fmt PUBLIC FMT_LOCALE)
