@@ -1,4 +1,4 @@
-//========= Copyright © 1996-2002, Valve LLC, All rights reserved. ============
+//========= Copyright ï¿½ 1996-2002, Valve LLC, All rights reserved. ============
 //
 // Purpose: 
 //
@@ -933,7 +933,8 @@ void CHudServers::RequestBroadcastList( int clearpending )
 	}
 
 	// Make sure to byte swap server if necessary ( using "host" to "net" conversion
-	adr.port = htons( PORT_SERVER );
+	unsigned short original = PORT_SERVER;
+	adr.port = (original & 0xFF) << 8 | (original >> 8 & 0xFF); //htons
 
 	// Make sure networking system has started.
 	NET_API->InitNetworking();
