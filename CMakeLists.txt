@@ -40,6 +40,7 @@ ExternalProject_Add(fmt
 
 add_subdirectory(cl_dll)
 add_subdirectory(dlls)
+add_subdirectory(modstub)
 
 add_dependencies(hl fmt)
 
