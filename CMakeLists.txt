@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.15)
 include(${CMAKE_SOURCE_DIR}/GetGitRevisionDescription.cmake)
-get_git_head_revision(GIT_REFSPEC HALFCRAFT_GIT_COMMIT)
+get_git_head_revision(GIT_REFSPEC BMC_GIT_COMMIT)
 
 cmake_policy(SET CMP0091 NEW)
 project(BlackMesaClassic VERSION 0.0.1)
