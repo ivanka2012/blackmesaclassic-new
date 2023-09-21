@@ -187,6 +187,7 @@ void DispatchKeyValue( edict_t *pentKeyvalue, KeyValueData *pkvd )
 
 	// If the key was an entity variable, or there's no class set yet, don't look for the object, it may
 	// not exist yet.
+	ALERT(at_notice, "%s : %s : %s : %s\n", pkvd->szClassName, pkvd->szKeyName, pkvd->szValue, pkvd->fHandled ? "handled" : "not handled");
 	if ( pkvd->fHandled || pkvd->szClassName == NULL )
 		return;
 

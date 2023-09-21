@@ -111,6 +111,7 @@ add_library(hl SHARED
     ../pm_shared/pm_debug.c
     ../pm_shared/pm_math.c
     ../pm_shared/pm_shared.c
+    model.cpp
     
 )
 configure_file(${CMAKE_SOURCE_DIR}/Config.h.in Config.h)
