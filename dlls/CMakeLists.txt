@@ -129,19 +129,7 @@ set_property(TARGET hl PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:De
 set_target_properties(hl PROPERTIES PREFIX "")
 add_definitions(-DWIN32 -DQUIVER -DNOMINMAX -DVOXEL -DQUAKE2 -DVALVE_DLL -DCLIENT_WEAPONS -DWINVER=0x0501 -D_WIN32_WINNT=0x0501)
 if(WIN32)
-    if(MSVC)
-        target_link_libraries(hl PUBLIC
-            ${CMAKE_BINARY_DIR}/fmt-bin/lib/fmt$<$<CONFIG:Debug>:d>.lib
-            ws2_32
-        )
-    else(NOT MSVC)
-        target_link_libraries(hl PUBLIC
-            ${CMAKE_BINARY_DIR}/fmt-bin/lib/fmt$<$<CONFIG:Debug>:d>.lib
-            ws2_32
-        )
-    endif()
     target_include_directories(hl PUBLIC
-        ${CMAKE_BINARY_DIR}/fmt-bin/include
         ${CMAKE_CURRENT_SOURCE_DIR}/../dlls
         ${CMAKE_CURRENT_SOURCE_DIR}/../engine
         ${CMAKE_CURRENT_SOURCE_DIR}/../common
