@@ -76,8 +76,6 @@ float		v_cameraFocusAngle	= 35.0f;
 int			v_cameraMode = CAM_MODE_FOCUS;
 qboolean	v_resetCamera = 1;
 
-vec3_t ev_punchangle;
-
 cvar_t	*scr_ofsx;
 cvar_t	*scr_ofsy;
 cvar_t	*scr_ofsz;
@@ -102,8 +100,54 @@ cvar_t	v_ipitch_level		= {"v_ipitch_level", "0.3", 0, 0.3};
 
 float	v_idlescale;  // used by TFC for concussion grenade effect
 
+
+// BMC : New Variables
+ref_params_s g_pparams;
+
+int jumped = 0;
+
+float	g_lateralBob;
+float	g_verticalBob;
+
+Vector punch;
+Vector ev_punchangle;
+Vector ev_classicpunch;
+
+Vector cl_jumppunch;
+Vector cl_jumpangles;
+
+cvar_t* cl_bobclassic;
+
+cvar_t* cl_weaponlag;
+cvar_t* cl_weaponlagscale;
+cvar_t* cl_weaponlagspeed;
+cvar_t* cl_weaponlagangles;
+cvar_t* cl_weaponlagorigin;
+
+cvar_t* cl_jumpanims;
+
+float view_bobAmplify = 1.f;
+
+// BMC : New Functions
+void Hl2Punch(float* ev_punchangle, float frametime, float *punch);
+
+void V_ElevateWeapon(struct ref_params_s* pparams, cl_entity_s* view);
+void V_UpdateViewModel(ref_params_s* pparams, cl_entity_s* view);
+
+// BMC : Macros
+#define clamp( val, min, max ) ( ((val) > (max)) ? (max) : ( ((val) < (min)) ? (min) : (val) ) ) // thx BUzer
+#define RemapVal( val, a, b, c, d ) (c + (d - c) * (val - a) / (b - a))
+
+#define	HL2_BOB_CYCLE_MAX	cl_bobcycle->value * 1.0f
+#define	HL2_BOB			cl_bob->value * 1.0f
+#define	HL2_BOB_UP		cl_bobup->value * 1.0f
+
+#define PUNCH_DAMPING		15.0f		// bigger number makes the response more damped, smaller is less damped
+// currently the system will overshoot, with larger damping values it won't
+#define PUNCH_SPRING_CONSTANT	65.5f	// bigger number increases the speed at which the view corrects
+
 //=============================================================================
-/*
+
 void V_NormalizeAngles( float *angles )
 {
 	int i;
@@ -129,6 +173,7 @@ Interpolate Euler angles.
 FIXME:  Use Quaternions to avoid discontinuities
 Frac is 0.0 to 1.0 ( i.e., should probably be clamped, but doesn't have to be )
 ===================
+*/
 
 void V_InterpolateAngles( float *start, float *end, float *output, float frac )
 {
@@ -158,7 +203,77 @@ void V_InterpolateAngles( float *start, float *end, float *output, float frac )
 	}
 
 	V_NormalizeAngles( output );
-} */
+}
+
+// BMC : Half Life 2 Weapon Bob
+float V_CalcHl2Bob(struct ref_params_s* pparams)
+{
+	static	float bobtime;
+	static	float lastbobtime;
+	float	cycle;
+
+	Vector	vel;
+	VectorCopy(pparams->simvel, vel);
+	vel[2] = 0;
+
+	if (pparams->onground == -1 || pparams->time == lastbobtime)
+	{
+		return 0.0f;
+	}
+
+	float speed = sqrt(vel[0] * vel[0] + vel[1] * vel[1]);
+
+	speed = clamp(speed, -320, 320);
+
+	float bob_offset = RemapVal(speed, 0, 320, 0.0f, 1.0f);
+
+	bobtime += (pparams->time - lastbobtime) * bob_offset;
+	lastbobtime = pparams->time;
+
+	//Calculate the vertical bob
+	cycle = bobtime - (int)(bobtime / HL2_BOB_CYCLE_MAX) * HL2_BOB_CYCLE_MAX;
+	cycle /= HL2_BOB_CYCLE_MAX;
+
+	if (cycle < HL2_BOB_UP)
+	{
+		cycle = M_PI * cycle / HL2_BOB_UP;
+	}
+	else
+	{
+		cycle = M_PI + M_PI * (cycle - HL2_BOB_UP) / (1.0 - HL2_BOB_UP);
+	}
+
+	g_verticalBob = speed * 0.004f;
+	g_verticalBob = g_verticalBob * 0.3 + g_verticalBob * 0.7 * sin(cycle);
+
+	float verticalScale = view_bobAmplify;
+	if(view_bobAmplify != 1.f)
+		verticalScale = view_bobAmplify / 2.f; /* "flatten" */
+	
+	g_verticalBob = clamp(g_verticalBob, -7.0f, 4.0f) * verticalScale;
+
+
+	//Calculate the lateral bob
+	cycle = bobtime - (int)(bobtime / HL2_BOB_CYCLE_MAX * 2) * HL2_BOB_CYCLE_MAX * 2;
+	cycle /= HL2_BOB_CYCLE_MAX * 2;
+	if (cycle < HL2_BOB_UP)
+	{
+		cycle = M_PI * cycle / HL2_BOB_UP;
+	}
+	else
+	{
+		cycle = M_PI + M_PI * (cycle - HL2_BOB_UP) / (1.0 - HL2_BOB_UP);
+	}
+
+	g_lateralBob = speed * 0.004f;
+	g_lateralBob = g_lateralBob * 0.3 + g_lateralBob * 0.7 * sin(cycle);
+
+	g_lateralBob = clamp(g_lateralBob, -7.0f, 4.0f) * view_bobAmplify;
+
+	//NOTENOTE: We don't use this return value in our case (need to restructure the calculation function setup!)
+	return 0.0f;
+}
+
 
 // Quakeworld bob code, this fixes jitters in the mutliplayer since the clock (pparams->time) isn't quite linear
 float V_CalcBob ( struct ref_params_s *pparams )
@@ -393,6 +508,229 @@ void V_AddIdle ( struct ref_params_s *pparams )
 	pparams->viewangles[YAW] += v_idlescale * sin(pparams->time*v_iyaw_cycle.value) * v_iyaw_level.value;
 }
 
+/*
+==============
+V_CalcViewModelLag
+
+Weapon Inertia
+==============
+*/
+void V_CalcViewModelLag(ref_params_t * pparams, Vector& origin, Vector& angles, Vector original_angles)
+{
+	float m_flWeaponLag = cl_weaponlag->value;
+
+	static Vector m_vecLastFacing;
+	Vector vOriginalOrigin = origin;
+	Vector vOriginalAngles = pparams->cl_viewangles;
+
+	Vector vecAngles;
+	Vector vecAdd;
+
+	float yaw = float();
+
+	// Calculate our drift
+	Vector	forward, right, up;
+	AngleVectors(vOriginalAngles, forward, right, up);
+
+	if (pparams->frametime != 0.0f)	// not in paused
+	{
+		Vector vDifference;
+
+		vDifference = forward - m_vecLastFacing;
+
+		float flSpeed = cl_weaponlagspeed->value;
+
+		// If we start to lag too far behind, we'll increase the "catch up" speed.
+		// Solves the problem with fast cl_yawspeed, m_yaw or joysticks rotating quickly.
+		// The old code would slam lastfacing with origin causing the viewmodel to pop to a new position
+		float flDiff = vDifference.Length();
+		if ((flDiff > m_flWeaponLag) && (m_flWeaponLag > 0.0f))
+		{
+			float flScale = flDiff / m_flWeaponLag;
+			flSpeed *= flScale;
+		}
+		// FIXME:  Needs to be predictable?
+		m_vecLastFacing = m_vecLastFacing + vDifference * (flSpeed * pparams->frametime);
+		// Make sure it doesn't grow out of control!!!
+		m_vecLastFacing = m_vecLastFacing.Normalize();
+		if (cl_weaponlagorigin->value && !cl_weaponlagangles->value)
+			origin = origin + (vDifference * -1.0f) * cl_weaponlagscale->value;
+
+		
+		// BNH : Add the difference to the angles too
+		yaw = V_CalcRoll(vOriginalAngles, vDifference, 0.75, 150) * 500;
+
+		vecAngles[0] = vDifference[2] * (-3.5);
+		vecAngles[1] = yaw;
+		vecAngles[ROLL] = 0;
+
+		vecAngles = vecAngles * (cl_weaponlagscale->value * 1.0f);
+
+		Vector pRight, pUp;
+		VectorCopy(pparams->up, pUp);
+		VectorCopy(pparams->right, pRight);
+
+		vecAdd = right * vecAngles[1] - pUp * vecAngles[0];
+
+		if (cl_weaponlagangles->value)
+		{
+			angles = angles - vecAngles*(cl_weaponlagscale->value / 1.65);
+			if (cl_weaponlagorigin->value)
+			{
+				origin = (origin + (vecAdd * -1.0f));
+			}
+		}
+	}
+
+	AngleVectors(original_angles, forward, right, up);
+
+	float pitch = original_angles[PITCH];
+
+	if (pitch > 180.0f)
+	{
+		pitch -= 360.0f;
+	}
+	else if (pitch < -180.0f)
+	{
+		pitch += 360.0f;
+	}
+
+	if (m_flWeaponLag <= 0.0f)
+	{
+		origin = vOriginalOrigin;
+		angles = vOriginalAngles;
+	}
+	else
+	{
+		// FIXME: These are the old settings that caused too many exposed polys on some models
+		origin = origin + forward * (-pitch * 0.035f);
+		origin = origin + right * (-pitch * 0.03f);
+		origin = origin + up * (-pitch * 0.02f);
+	}
+}
+
+/*
+==============
+V_SetJumpState
+==============
+*/
+
+void V_SetJumpState(struct ref_params_s* pparams)
+{
+	float zVel = fabs(pparams->simvel[2]);
+	int onground = pparams->onground;
+
+	if (jumped == 0 && !onground && zVel > 150)
+	{
+		jumped = 3;
+		return;
+	}
+
+}
+/*
+==============
+V_JumpPunch
+
+Jumping effect
+==============
+*/
+void V_JumpPunch(struct ref_params_s* pparams, cl_entity_s* view)
+{
+	float zVel = fabs(pparams->simvel[2]);
+	int onground = pparams->onground;
+	static float flFallVelocity = 0.0f;
+
+	// If we are not on ground, store off how fast we are falling
+	if (!onground)
+	{
+		flFallVelocity = -pparams->simvel[2];
+	}
+
+	V_SetJumpState(pparams);
+	V_ElevateWeapon(pparams, view);
+
+	if (jumped == 1)
+	{
+		cl_jumppunch[0] = -5 * 20;
+		cl_jumppunch[1] = 2 * 20;
+		cl_jumppunch[2] = 20;
+		punch[0] = -5;
+		jumped = 2;
+	}
+	else if (jumped == 2)
+	{
+		if (onground)
+		{
+			cl_jumppunch[0] = (-flFallVelocity * 0.00755) * 20;
+			cl_jumppunch[1] = (flFallVelocity * 0.00755) * 20;
+			punch[0] = (flFallVelocity * 0.00175) * 20;
+			jumped = 0;
+		}
+	}
+	else if (jumped == 3)
+	{
+		if (onground)
+		{
+			cl_jumppunch[0] = (-flFallVelocity * 0.013) * 20;
+			punch[0] = (flFallVelocity * 0.00555) * 20;
+			jumped = 0;
+		}
+	}
+}
+
+/*
+==============
+V_UpdateViewModel
+==============
+*/
+void V_UpdateViewModel(ref_params_s* pparams, cl_entity_s* view)
+{
+	view->angles = view->angles + (QuakeBug(ev_punchangle) / 1.15);
+	view->angles = view->angles + (QuakeBug(ev_classicpunch) / 1.15);
+
+	view->angles = view->angles + cl_jumpangles;
+	view->origin = view->origin - (Vector(pparams->forward) * (cl_jumpangles[1] * 0.4f));
+}
+/*
+==============
+V_ElevateWeapon
+==============
+*/
+void V_ElevateWeapon(struct ref_params_s* pparams, cl_entity_s* view)
+{
+	static float flElev = 0;
+
+	const float elevrate = 7.5f;
+	const float descrate = 25.0f;
+	const float maxelev = 3.0f;
+
+	double frametime = pparams->frametime;
+	if (jumped > 1)
+	{
+		if (flElev < maxelev)
+		{
+			flElev += elevrate * frametime;
+			if (flElev > maxelev)
+			{
+				flElev = maxelev;
+			}
+		}
+	}
+	else
+	{
+		if (flElev > 0)
+		{
+			flElev -= descrate * frametime;
+			if (flElev < 0)
+			{
+				flElev = 0;
+			}
+		}
+	}
+
+	view->angles[0] += flElev;
+}
+
  
 /*
 ==============
@@ -518,11 +856,13 @@ void V_CalcNormalRefdef ( struct ref_params_s *pparams )
 
 	// transform the view offset by the model's matrix to get the offset from
 	// model origin for the view
-	bob = V_CalcBob ( pparams );
+	if (cl_bobclassic->value)
+		bob = V_CalcBob ( pparams );
 
 	// refresh position
 	VectorCopy ( pparams->simorg, pparams->vieworg );
-	pparams->vieworg[2] += ( bob );
+	if (cl_bobclassic->value)
+		pparams->vieworg[2] += ( bob );
 	VectorAdd( pparams->vieworg, pparams->viewheight, pparams->vieworg );
 
 	VectorCopy ( pparams->cl_viewangles, pparams->viewangles );
@@ -651,16 +991,46 @@ void V_CalcNormalRefdef ( struct ref_params_s *pparams )
 	// Let the viewmodel shake at about 10% of the amplitude
 	gEngfuncs.V_ApplyShake( view->origin, view->angles, 0.9 );
 
-	for ( i = 0; i < 3; i++ )
-	{
-		view->origin[ i ] += bob * 0.4 * pparams->forward[ i ];
-	}
-	view->origin[2] += bob;
+	if (cl_bobclassic->value)
+ 	{
+		for (i = 0; i < 3; i++)
+		{
+			view->origin[i] += bob * 0.4 * pparams->forward[i];
+		}
+		view->origin[2] += bob;
 
-	// throw in a little tilt.
-	view->angles[YAW]   -= bob * 0.5;
-	view->angles[ROLL]  -= bob * 1;
-	view->angles[PITCH] -= bob * 0.3;
+		//if (cl_bobtilt->value)
+		//{
+			// throw in a little tilt.
+			view->angles[YAW] -= bob * 0.5;
+			view->angles[ROLL] -= bob * 1;
+			view->angles[PITCH] -= bob * 0.3;
+		//}
+ 	}
+	else
+	{
+		Vector	forward, right, up;
+
+		AngleVectors(pparams->cl_viewangles, forward, right, up);
+
+		V_CalcHl2Bob(pparams);
+
+		// Apply bob, but scaled down to 40%
+		VectorMA(pparams->vieworg, g_verticalBob * 0.2f, pparams->forward, pparams->vieworg);
+		VectorMA(view->origin, g_verticalBob * 0.25f, up, view->origin);
+
+		// Z bob a bit more
+		view->origin[2] += g_verticalBob * 0.1f;
+
+		// bob the angles
+		angles[ROLL] += g_verticalBob * 0.3f;
+		angles[PITCH] -= g_verticalBob * 0.8f;
+
+		angles[YAW] -= g_lateralBob * 0.8f;
+
+		VectorMA(view->origin, g_lateralBob * 0.9f, right, view->origin);
+
+	}
 
 	// pushing the view origin down off of the same X/Z plane as the ent's origin will give the
 	// gun a very nice 'shifting' effect when the player looks up/down. If there is a problem
@@ -691,8 +1061,20 @@ void V_CalcNormalRefdef ( struct ref_params_s *pparams )
 
 	// Include client side punch, too
 	VectorAdd ( pparams->viewangles, (float *)&ev_punchangle, pparams->viewangles);
+	VectorAdd ( pparams->viewangles, (float *)&ev_classicpunch, pparams->viewangles );
 
-	V_DropPunchAngle ( pparams->frametime, (float *)&ev_punchangle );
+	V_DropPunchAngle ( pparams->frametime, (float *)&ev_classicpunch );
+
+	Hl2Punch( (float*)&ev_punchangle, pparams->frametime, punch );
+	Hl2Punch( (float*)&cl_jumpangles, pparams->frametime, cl_jumppunch );
+
+	V_CalcViewModelLag(pparams, view->origin, view->angles, Vector(pparams->cl_viewangles));
+
+	V_JumpPunch(pparams, view);
+
+	V_UpdateViewModel(pparams, view);
+
+	VectorCopy(view->angles, view->curstate.angles);
 
 	// smooth out stair step ups
 #if 1
@@ -1647,6 +2029,7 @@ void CL_DLLEXPORT V_CalcRefdef( struct ref_params_s *pparams )
 		V_CalcNormalRefdef ( pparams );
 	}
 
+
 /*
 // Example of how to overlay the whole screen with red at 50 % alpha
 #define SF_TEST
@@ -1685,6 +2068,41 @@ void V_DropPunchAngle ( float frametime, float *ev_punchangle )
 
 /*
 =============
+BMC : PLut Client Punch From HL2
+=============
+*/
+void Hl2Punch(float* ev_punchangle, float frametime, float *punch)
+{
+	float damping;
+	float springForceMagnitude;
+
+	if (Length(ev_punchangle) > 0.001 || Length(punch) > 0.001)
+	{
+		VectorMA(ev_punchangle, frametime, punch, ev_punchangle);
+		damping = 1 - (PUNCH_DAMPING * frametime);
+
+		if (damping < 0)
+		{
+			damping = 0;
+		}
+		VectorScale(punch, damping, punch);
+
+		// torsional spring
+		// UNDONE: Per-axis spring constant?
+		springForceMagnitude = PUNCH_SPRING_CONSTANT * frametime;
+		springForceMagnitude = clamp(springForceMagnitude, 0, 2);
+
+		VectorMA(punch, -springForceMagnitude, ev_punchangle, punch);
+
+		// don't wrap around
+		ev_punchangle[0] = clamp(ev_punchangle[0], -7, 7);
+		ev_punchangle[1] = clamp(ev_punchangle[1], -179, 179);
+		ev_punchangle[2] = clamp(ev_punchangle[2], -7, 7);
+	}
+}
+
+/*
+=============
 V_PunchAxis
 
 Client side punch effect
@@ -1692,7 +2110,12 @@ Client side punch effect
 */
 void V_PunchAxis( int axis, float punch )
 {
-	ev_punchangle[ axis ] = punch;
+	::punch[ axis ] = punch * 20;
+}
+
+void V_PunchAxisClassic( int axis, float punch )
+{
+	ev_classicpunch[axis] = punch;
 }
 
 /*
@@ -1711,11 +2134,21 @@ void V_Init (void)
 	v_centermove		= gEngfuncs.pfnRegisterVariable( "v_centermove", "0.15", 0 );
 	v_centerspeed		= gEngfuncs.pfnRegisterVariable( "v_centerspeed","500", 0 );
 
-	cl_bobcycle			= gEngfuncs.pfnRegisterVariable( "cl_bobcycle","0.8", 0 );// best default for my experimental gun wag (sjb)
-	cl_bob				= gEngfuncs.pfnRegisterVariable( "cl_bob","0.01", 0 );// best default for my experimental gun wag (sjb)
+	cl_bobcycle			= gEngfuncs.pfnRegisterVariable( "cl_bobcycle","0.45", 0 );// best default for my experimental gun wag (sjb)
+	cl_bob				= gEngfuncs.pfnRegisterVariable( "cl_bob","0.002", 0 );// best default for my experimental gun wag (sjb)
 	cl_bobup			= gEngfuncs.pfnRegisterVariable( "cl_bobup","0.5", 0 );
 	cl_waterdist		= gEngfuncs.pfnRegisterVariable( "cl_waterdist","4", 0 );
 	cl_chasedist		= gEngfuncs.pfnRegisterVariable( "cl_chasedist","112", 0 );
+
+	cl_bobclassic		= gEngfuncs.pfnRegisterVariable("bmc_classicbob", "0", FCVAR_ARCHIVE);
+
+	cl_weaponlag		= gEngfuncs.pfnRegisterVariable("bmc_weaponlag", "1.5", FCVAR_ARCHIVE);
+	cl_weaponlagscale	= gEngfuncs.pfnRegisterVariable("bmc_weaponlagscale", "2.5", FCVAR_ARCHIVE);
+	cl_weaponlagspeed	= gEngfuncs.pfnRegisterVariable("bmc_weaponlagspeed", "5.5", FCVAR_ARCHIVE);
+	cl_weaponlagangles	= gEngfuncs.pfnRegisterVariable("bmc_weaponlagangles", "1", FCVAR_ARCHIVE);
+	cl_weaponlagorigin  = gEngfuncs.pfnRegisterVariable("bmc_weaponlagorigin", "1", FCVAR_ARCHIVE);
+
+	cl_jumpanims		= gEngfuncs.pfnRegisterVariable("bmc_jumpanims", "1", FCVAR_ARCHIVE);
 }
 
 

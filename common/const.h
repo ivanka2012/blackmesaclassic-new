@@ -779,5 +779,8 @@ typedef struct
 	int		hitgroup;		// 0 == generic, non zero is specific body part
 } trace_t;
 
+// fix inverse pitch bug
+#define QuakeBug(x) Vector(-x[0], x[1], x[2])
+
 #endif
 
