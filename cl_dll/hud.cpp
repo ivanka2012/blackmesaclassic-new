@@ -84,6 +84,9 @@ extern client_sprite_t *GetSpriteList(client_sprite_t *pList, const char *psz, i
 extern cvar_t *sensitivity;
 cvar_t *cl_lw = NULL;
 
+cvar_t *cl_rollangle;
+cvar_t *cl_rollspeed;
+
 void ShutdownInput (void);
 
 //DECLARE_MESSAGE(m_Logo, Logo)
@@ -371,6 +374,9 @@ void CHud :: Init( void )
 	ServersInit();
 
 	MsgFunc_ResetHUD(0, 0, NULL );
+
+	cl_rollangle = gEngfuncs.pfnRegisterVariable ( "cl_rollangle", "0.65", FCVAR_CLIENTDLL|FCVAR_ARCHIVE );
+	cl_rollspeed = gEngfuncs.pfnRegisterVariable ( "cl_rollspeed", "300", FCVAR_CLIENTDLL|FCVAR_ARCHIVE );
 }
 
 // CHud destructor
