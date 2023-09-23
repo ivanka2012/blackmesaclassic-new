@@ -29,10 +29,15 @@ enum mp5_e
 	MP5_IDLE1,
 	MP5_LAUNCH,
 	MP5_RELOAD,
+	MP5_RELOAD_EMPTY,
 	MP5_DEPLOY,
 	MP5_FIRE1,
 	MP5_FIRE2,
 	MP5_FIRE3,
+	MP5_FIRST_DRAW,
+	MP5_FASTRUN_BEGIN,
+	MP5_FASTRUN_IDLE,
+	MP5_FASTRUN_END,
 };
 
 
@@ -56,6 +61,8 @@ void CMP5::Spawn( )
 	m_iId = WEAPON_MP5;
 
 	m_iDefaultAmmo = MP5_DEFAULT_GIVE;
+
+	runningState = NONE;
 
 	FallInit();// get ready to fall down.
 }
@@ -88,6 +95,7 @@ void CMP5::Precache( void )
 
 	m_usMP5 = PRECACHE_EVENT( 1, "events/mp5.sc" );
 	m_usMP52 = PRECACHE_EVENT( 1, "events/mp52.sc" );
+
 }
 
 int CMP5::GetItemInfo(ItemInfo *p)
@@ -252,9 +260,12 @@ void CMP5::Reload( void )
 	if ( m_pPlayer->ammo_9mm <= 0 )
 		return;
 
-	DefaultReload( MP5_MAX_CLIP, MP5_RELOAD, 1.5 );
+	//Players will love this
+	if(m_iClip > 0)
+		DefaultReload( MP5_MAX_CLIP, MP5_RELOAD, 1.5 );
+	else
+		DefaultReload( MP5_MAX_CLIP, MP5_RELOAD_EMPTY, 1.5 );
 }
-
 
 void CMP5::WeaponIdle( void )
 {
@@ -262,8 +273,40 @@ void CMP5::WeaponIdle( void )
 
 	m_pPlayer->GetAutoaimVector( AUTOAIM_5DEGREES );
 
+	
+	bool runCondition = (m_pPlayer->pev->button & IN_RUN) && (m_pPlayer->pev->velocity.Length() > 450.f);
+
+	if(runningState == NONE && runCondition){
+		SendWeaponAnim(MP5_FASTRUN_BEGIN);
+		m_flTimeWeaponIdle = (8.f) / 30;
+		runningState = START;
+		return;
+	}
+
 	if ( m_flTimeWeaponIdle > UTIL_WeaponTimeBase() )
 		return;
+
+	if(runningState == START && runCondition && m_flTimeWeaponIdle <= UTIL_WeaponTimeBase()){
+		SendWeaponAnim(MP5_FASTRUN_IDLE);
+		m_flTimeWeaponIdle = (19.f) / 30;
+		runningState = IDLE;
+		return;
+	}
+
+	if(runningState == IDLE && runCondition){
+		m_flTimeWeaponIdle = (19.f) / 30;
+		runningState = IDLE;
+		return;
+	}
+
+	if(runningState != NONE && !runCondition){
+		SendWeaponAnim(MP5_FASTRUN_END);
+		runningState = NONE;
+		m_flTimeWeaponIdle = (8.f) / 30;
+		return;
+	}else if(runningState != NONE){
+		return ;
+	}
 
 	int iAnim;
 	switch ( RANDOM_LONG( 0, 1 ) )
@@ -280,7 +323,7 @@ void CMP5::WeaponIdle( void )
 
 	SendWeaponAnim( iAnim );
 
-	m_flTimeWeaponIdle = UTIL_SharedRandomFloat( m_pPlayer->random_seed, 10, 15 ); // how long till we do this again.
+	m_flTimeWeaponIdle =  UTIL_SharedRandomFloat( m_pPlayer->random_seed, 10, 15 ); // how long till we do this again.
 }
 
 

@@ -101,19 +101,19 @@ if(WIN32)
     add_definitions(-DWIN32)
     if(MSVC)
         target_link_libraries(client PUBLIC
-            ${CMAKE_BINARY_DIR}/fmt-bin/lib/fmt$<$<CONFIG:Debug>:d>.lib
+            #${CMAKE_BINARY_DIR}/fmt-bin/lib/fmt$<$<CONFIG:Debug>:d>.lib
             ${CMAKE_CURRENT_SOURCE_DIR}/../utils/vgui/lib/win32_vc6/vgui.lib
             ${CMAKE_CURRENT_SOURCE_DIR}/../lib/public/SDL2.lib
         )
     else(NOT MSVC) #mingw
         target_link_libraries(client PUBLIC
-            ${CMAKE_BINARY_DIR}/fmt-bin/lib/fmt$<$<CONFIG:Debug>:d>.lib
+            #${CMAKE_BINARY_DIR}/fmt-bin/lib/fmt$<$<CONFIG:Debug>:d>.lib
             ${CMAKE_CURRENT_SOURCE_DIR}/../utils/vgui/lib/win32_vc6/vgui.lib
             ${CMAKE_CURRENT_SOURCE_DIR}/../lib/public/SDL2.lib
         )
     endif()
     target_include_directories(client PUBLIC
-        ${CMAKE_BINARY_DIR}/fmt-bin/include
+        #${CMAKE_BINARY_DIR}/fmt-bin/include
         ${CMAKE_CURRENT_SOURCE_DIR}/../dlls
         ${CMAKE_CURRENT_SOURCE_DIR}/../cl_dll
         ${CMAKE_CURRENT_SOURCE_DIR}/../public
@@ -127,7 +127,8 @@ if(WIN32)
     )
 endif()
 if(MSVC)
-    target_compile_options(client PRIVATE "/MP")
+    target_compile_options(client PRIVATE /MP /GL)
+    target_link_options(client PRIVATE /LTCG /OPT:REF)
     add_definitions(-D_CRT_SECURE_NO_WARNINGS)
 endif()
 install(TARGETS client RUNTIME DESTINATION bmc/cl_dlls)

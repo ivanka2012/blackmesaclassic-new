@@ -661,6 +661,7 @@ void CBasePlayerWeapon::ItemPostFrame( void )
 		m_flLastFireTime = 0.0f;
 	}
 
+
 	if ((m_pPlayer->pev->button & IN_ATTACK2) && CanAttack( m_flNextSecondaryAttack, gpGlobals->time, UseDecrement() ) )
 	{
 		if ( pszAmmo2() && !m_pPlayer->m_rgAmmo[SecondaryAmmoIndex()] )

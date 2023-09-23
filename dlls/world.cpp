@@ -490,7 +490,8 @@ void CWorld :: Precache( void )
 
 	CVAR_SET_STRING("room_type", "0");// clear DSP
 
-	CVAR_SET_STRING("sv_maxspeed", "600");
+	//apparently 600 is too fast...
+	CVAR_SET_STRING("sv_maxspeed", "500");
 
 	// Set up game rules
 	if (g_pGameRules)

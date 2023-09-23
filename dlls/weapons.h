@@ -331,6 +331,10 @@ public:
 	virtual BOOL ShouldWeaponIdle( void ) {return FALSE; };
 	virtual void Holster( int skiplocal = 0 );
 	virtual BOOL UseDecrement( void ) { return FALSE; };
+
+	bool gunAnimRunning;
+
+	virtual void RunAnim() { }
 	
 	int	PrimaryAmmoIndex(); 
 	int	SecondaryAmmoIndex(); 
@@ -557,6 +561,12 @@ public:
 
 private:
 	unsigned short m_usFirePython;
+
+	enum{
+		NONE = 0,
+		START,
+		IDLE
+	} runningState;
 };
 
 class CMP5 : public CBasePlayerWeapon
@@ -589,6 +599,12 @@ public:
 private:
 	unsigned short m_usMP5;
 	unsigned short m_usMP52;
+
+	enum{
+		NONE = 0,
+		START,
+		IDLE
+	} runningState;
 };
 
 class CCrossbow : public CBasePlayerWeapon

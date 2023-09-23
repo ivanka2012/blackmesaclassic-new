@@ -1,4 +1,4 @@
-//========= Copyright © 1996-2002, Valve LLC, All rights reserved. ============
+//========= Copyright ï¿½ 1996-2002, Valve LLC, All rights reserved. ============
 //
 // Purpose: 
 //
@@ -55,10 +55,15 @@ enum mp5_e
 	MP5_IDLE1,
 	MP5_LAUNCH,
 	MP5_RELOAD,
+	MP5_RELOAD_EMPTY,
 	MP5_DEPLOY,
 	MP5_FIRE1,
 	MP5_FIRE2,
 	MP5_FIRE3,
+	MP5_FIRST_DRAW,
+	MP5_FASTRUN_BEGIN,
+	MP5_FASTRUN_IDLE,
+	MP5_FASTRUN_END,
 };
 
 enum python_e {

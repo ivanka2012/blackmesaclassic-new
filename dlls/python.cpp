@@ -31,7 +31,15 @@ enum python_e {
 	PYTHON_HOLSTER,
 	PYTHON_DRAW,
 	PYTHON_IDLE2,
-	PYTHON_IDLE3
+	PYTHON_IDLE3,
+	PYTHON_FIRSTDRAW,
+	PYTHON_FASTRUN_BEGIN,
+	PYTHON_FASTRUN_IDLE,
+	PYTHON_FASTRUN_END,
+	PYTHON_IRON_BEGIN,
+	PYTHON_IRON_IDLE,
+	PYTHON_IRON_FIRE,
+	PYTHON_IRON_END,
 };
 
 LINK_ENTITY_TO_CLASS( weapon_python, CPython );
@@ -233,7 +241,7 @@ void CPython::Reload( void )
 	bUseScope = g_pGameRules->IsMultiplayer();
 #endif
 
-	DefaultReload( 6, PYTHON_RELOAD, 2.0, bUseScope );
+	DefaultReload( 6, PYTHON_RELOAD, 125.f / 30.f, bUseScope );
 }
 
 
@@ -243,8 +251,39 @@ void CPython::WeaponIdle( void )
 
 	m_pPlayer->GetAutoaimVector( AUTOAIM_10DEGREES );
 
-	if (m_flTimeWeaponIdle > UTIL_WeaponTimeBase() )
+	bool runCondition = (m_pPlayer->pev->button & IN_RUN) && (m_pPlayer->pev->velocity.Length() > 450.f);
+
+	if(runningState == NONE && runCondition){
+		SendWeaponAnim(PYTHON_FASTRUN_BEGIN);
+		m_flTimeWeaponIdle = (9.f) / 30;
+		runningState = START;
 		return;
+	}
+
+	if ( m_flTimeWeaponIdle > UTIL_WeaponTimeBase() )
+		return;
+
+	if(runningState == START && runCondition && m_flTimeWeaponIdle <= UTIL_WeaponTimeBase()){
+		SendWeaponAnim(PYTHON_FASTRUN_IDLE);
+		m_flTimeWeaponIdle = (59.f) / 30;
+		runningState = IDLE;
+		return;
+	}
+
+	if(runningState == IDLE && runCondition){
+		m_flTimeWeaponIdle = (59.f) / 30;
+		runningState = IDLE;
+		return;
+	}
+
+	if(runningState != NONE && !runCondition){
+		SendWeaponAnim(PYTHON_FASTRUN_END);
+		runningState = NONE;
+		m_flTimeWeaponIdle = (20.f) / 30;
+		return;
+	}else if(runningState != NONE){
+		return ;
+	}
 
 	int iAnim;
 	float flRand = UTIL_SharedRandomFloat( m_pPlayer->random_seed, 0, 1 );
